@@ -1,9 +1,9 @@
--- Place this in StarterPlayer > StarterPlayerScripts
+-- Place in StarterPlayer > StarterPlayerScripts
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local UserInputService = game:GetService("UserInputService")
 
--- Create GUI
+-- GUI Setup
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "TeleportGUI"
 screenGui.ResetOnSpawn = false
@@ -16,7 +16,7 @@ frame.Position = UDim2.new(0, 10, 0.5, -150)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 0
 frame.Active = true
-frame.Draggable = false
+frame.Draggable = false -- We use custom drag for both PC and mobile
 frame.Parent = screenGui
 
 -- Title Bar
@@ -31,28 +31,36 @@ title.TextXAlignment = Enum.TextXAlignment.Center
 title.Name = "Title"
 title.Parent = frame
 
--- Scrollable Player List
+-- Scrollable Frame
 local scroll = Instance.new("ScrollingFrame")
 scroll.Size = UDim2.new(1, 0, 1, -30)
 scroll.Position = UDim2.new(0, 0, 0, 30)
 scroll.BackgroundTransparency = 1
 scroll.ScrollBarThickness = 8
-scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 scroll.Parent = frame
 
--- List Layout
+-- Layout for buttons
 local layout = Instance.new("UIListLayout")
 layout.Parent = scroll
 layout.Padding = UDim.new(0, 5)
 layout.SortOrder = Enum.SortOrder.LayoutOrder
 
--- Dragging Logic
+-- Custom Drag System (supports mouse and mobile touch)
 local dragging = false
 local dragStart, startPos
 
+local function updateDrag(input)
+	local delta = input.Position - dragStart
+	frame.Position = UDim2.new(
+		startPos.X.Scale, startPos.X.Offset + delta.X,
+		startPos.Y.Scale, startPos.Y.Offset + delta.Y
+	)
+end
+
 title.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		dragging = true
 		dragStart = input.Position
 		startPos = frame.Position
@@ -66,26 +74,25 @@ title.InputBegan:Connect(function(input)
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-		local delta = input.Position - dragStart
-		frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		updateDrag(input)
 	end
 end)
 
--- Teleport Function
+-- Teleport Logic
 local function teleportToPlayer(targetPlayer)
-	local char = LocalPlayer.Character
+	local myChar = LocalPlayer.Character
 	local targetChar = targetPlayer.Character
 
-	if char and targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
-		local hrp = char:FindFirstChild("HumanoidRootPart")
-		if hrp then
-			hrp.CFrame = targetChar.HumanoidRootPart.CFrame + Vector3.new(0, 5, 0)
+	if myChar and targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
+		local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+		if myRoot then
+			myRoot.CFrame = targetChar.HumanoidRootPart.CFrame + Vector3.new(0, 5, 0)
 		end
 	end
 end
 
--- Create a button for a player
+-- Create player button
 local function makePlayerButton(player)
 	local button = Instance.new("TextButton")
 	button.Size = UDim2.new(1, -10, 0, 30)
@@ -103,24 +110,22 @@ end
 
 -- Refresh player list
 local function refreshList()
-	-- Remove all existing buttons
 	for _, child in pairs(scroll:GetChildren()) do
 		if child:IsA("TextButton") then
 			child:Destroy()
 		end
 	end
 
-	-- Add current players
-	for _, player in ipairs(Players:GetPlayers()) do
+	for _, player in pairs(Players:GetPlayers()) do
 		if player ~= LocalPlayer then
 			makePlayerButton(player)
 		end
 	end
 end
 
--- Handle players joining/leaving
+-- Update on player join/leave
 Players.PlayerAdded:Connect(refreshList)
 Players.PlayerRemoving:Connect(refreshList)
 
--- Initial setup
+-- Initial population
 refreshList()
